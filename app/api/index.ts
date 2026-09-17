@@ -50,7 +50,7 @@ export default async function handler(
 
   const method = (req.method ?? "GET").toUpperCase();
   const hasBody = method !== "GET" && method !== "HEAD";
-  const body = hasBody
+  const bodyBuf = hasBody
     ? await new Promise<Buffer>((resolve, reject) => {
         const chunks: Buffer[] = [];
         req.on("data", (c: Buffer) => chunks.push(c));
@@ -58,6 +58,8 @@ export default async function handler(
         req.on("error", reject);
       })
     : undefined;
+  /* Buffer's generic typing clashes with BodyInit — a plain Uint8Array is accepted */
+  const body = bodyBuf ? new Uint8Array(bodyBuf) : undefined;
 
   const webReq = new Request(url, { method, headers, body });
   const webRes = await app.fetch(webReq);
