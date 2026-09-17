@@ -52,6 +52,8 @@ async function seed() {
     facts: p.facts,
     related: p.related,
     ta: placesTa[p.id] ?? null,
+    status: "published" as const,
+    publishedAt: new Date(),
   }));
   await db.insert(placeArticles).values(placeRows);
   console.log(`  places: ${placeRows.length}`);
@@ -65,9 +67,11 @@ async function seed() {
     img: s.img,
     placeSlug: s.placeId ?? null,
     lede: s.lede,
-    body: s.body,
+    body: JSON.stringify(s.body),
     ta: storiesTa[s.id] ?? null,
     sort: i,
+    status: "published" as const,
+    publishedAt: new Date(),
   }));
   await db.insert(storiesTable).values(storyRows);
   console.log(`  stories: ${storyRows.length}`);
