@@ -38,5 +38,8 @@
       "path": "/api/newsletter/run-weekly",
       "schedule": "30 0 * * *"
     }
+  ],
+  "regions": [
+    "iad1"
   ]
 }
