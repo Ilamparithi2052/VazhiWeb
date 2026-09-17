@@ -12,7 +12,7 @@ import { toHtml } from '../richtext';
 
 /* ================================================================== types */
 
-type Section = 'home' | 'posts' | 'series' | 'places' | 'journeys' | 'destinations' | 'contributions' | 'insights' | 'newsletter' | 'gallery' | 'sections' | 'atlas' | 'settings';
+type Section = 'home' | 'posts' | 'series' | 'places' | 'journeys' | 'destinations' | 'contributions' | 'newsletter' | 'gallery' | 'sections' | 'atlas' | 'settings';
 type StatusFilter = 'published' | 'draft' | 'trash';
 
 /* =================================================== studio palette (light) */
@@ -397,133 +397,6 @@ function AtlasPanel({
         ) : (
           <p className="text-[0.8rem] text-[#a08b66]">This destination has no map image yet — set one in the Destinations tab ("Map image").</p>
         )}
-      </div>
-    </div>
-  );
-}
-
-/* ======================================================= insights panel */
-
-const fmtDwell = (sec: number) => {
-  if (sec < 60) return `${sec}s`;
-  const m = Math.floor(sec / 60);
-  const s2 = sec % 60;
-  return s2 ? `${m}m ${s2}s` : `${m}m`;
-};
-
-const COUNTRY_NAMES: Record<string, string> = {
-  IN: 'India', LK: 'Sri Lanka', JP: 'Japan', CN: 'China', SG: 'Singapore', AE: 'UAE', TH: 'Thailand',
-  HK: 'Hong Kong', KR: 'South Korea', ID: 'Indonesia', PK: 'Pakistan', BD: 'Bangladesh', NP: 'Nepal',
-  SA: 'Saudi Arabia', IR: 'Iran', IL: 'Israel', TR: 'Turkey', AM: 'Armenia', GE: 'Georgia', MY: 'Malaysia',
-  PH: 'Philippines', VN: 'Vietnam', MM: 'Myanmar', TW: 'Taiwan', QA: 'Qatar', KW: 'Kuwait', OM: 'Oman',
-  GB: 'United Kingdom', FR: 'France', DE: 'Germany', ES: 'Spain', IT: 'Italy', NL: 'Netherlands',
-  BE: 'Belgium', CH: 'Switzerland', AT: 'Austria', SE: 'Sweden', NO: 'Norway', DK: 'Denmark', FI: 'Finland',
-  IE: 'Ireland', PT: 'Portugal', GR: 'Greece', PL: 'Poland', CZ: 'Czechia', HU: 'Hungary', RU: 'Russia',
-  UA: 'Ukraine', RO: 'Romania', US: 'United States', CA: 'Canada', MX: 'Mexico', BR: 'Brazil', AR: 'Argentina',
-  CL: 'Chile', CO: 'Colombia', PE: 'Peru', AU: 'Australia', NZ: 'New Zealand', FJ: 'Fiji', EG: 'Egypt',
-  NG: 'Nigeria', KE: 'Kenya', ZA: 'South Africa', MA: 'Morocco',
-};
-
-const countryFlag = (cc: string) =>
-  cc.length === 2 ? String.fromCodePoint(...[...cc].map((ch) => 0x1f1e6 + ch.charCodeAt(0) - 65)) : '';
-
-/** Studio analytics — traffic overview, per-article reading stats, world hotspots. */
-function InsightsPanel({
-  stories, places,
-}: {
-  stories: { id: string; title: string }[];
-  places: { id: string; title: string }[];
-}) {
-  const q = trpc.content.analyticsOverview.useQuery(undefined, { refetchInterval: 60_000 });
-  const d = q.data;
-
-  const titleOf = (kind: string, refId: string) => {
-    const hit = kind === 'story' ? stories.find((x) => x.id === refId) : places.find((x) => x.id === refId);
-    return hit?.title ?? refId;
-  };
-
-  if (q.isLoading) return <p className="text-[0.85rem] text-[#a08b66]">Crunching the numbers…</p>;
-  if (!d) return <p className="text-[0.85rem] text-[#c05f4e]">Could not load analytics.</p>;
-
-  const maxDaily = Math.max(1, ...d.daily.map((x) => x.views));
-  const maxCountry = Math.max(1, ...d.countries.map((x) => x.views));
-  const empty = d.totalViews === 0;
-
-  const kpis = [
-    { label: 'Total views', value: String(d.totalViews) },
-    { label: 'Today', value: String(d.viewsToday) },
-    { label: 'Last 7 days', value: String(d.views7d) },
-    { label: 'Avg. reading time', value: fmtDwell(d.avgDwell) },
-  ];
-
-  return (
-    <div className="space-y-8">
-      {empty && (
-        <div className={`rounded-xl border ${C.border} bg-[#fdfaf3] px-5 py-4 text-[0.82rem] leading-relaxed text-[#7a6a50]`}>
-          No traffic recorded yet — tracking just started. Open the site in another tab (or share it), and views, reading time and countries will appear here within a minute. Studio visits (/admin) are never counted, and no IPs or cookies are stored.
-        </div>
-      )}
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {kpis.map((k) => (
-          <div key={k.label} className={`rounded-xl border ${C.borderSoft} bg-white px-5 py-4`}>
-            <p className="text-[0.6rem] font-semibold uppercase tracking-[0.2em] text-[#a08b66]">{k.label}</p>
-            <p className="font-display mt-1.5 text-[1.7rem] leading-none text-[#2c2418]">{k.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className={`rounded-xl border ${C.border} bg-white p-5`}>
-        <p className={labelCls}>Views — last 14 days</p>
-        <div className="flex h-36 items-end gap-1.5">
-          {d.daily.map((x) => (
-            <div key={x.day} className="group relative flex-1">
-              <div
-                className="w-full rounded-t bg-[#b98a4a]/70 transition-colors group-hover:bg-[#b98a4a]"
-                style={{ height: `${Math.max(3, (x.views / maxDaily) * 130)}px` }}
-              />
-              <div className="pointer-events-none absolute -top-9 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#2c2418] px-2 py-1 text-[0.62rem] text-[#f5edd9] opacity-0 transition-opacity group-hover:opacity-100">
-                {x.views} · {new Date(x.day + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className={`rounded-xl border ${C.border} bg-white p-5`}>
-          <p className={labelCls}>Traffic by country</p>
-          {d.countries.length === 0 && <p className="text-[0.8rem] text-[#c4b291]">No data yet.</p>}
-          <div className="space-y-2.5">
-            {d.countries.map((c) => (
-              <div key={c.country} className="flex items-center gap-3">
-                <span className="w-6 text-center text-[1rem]">{countryFlag(c.country)}</span>
-                <span className="w-32 truncate text-[0.8rem] text-[#2c2418]">{COUNTRY_NAMES[c.country] ?? c.country}</span>
-                <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-[#f5edd9]">
-                  <div className="h-full rounded-full bg-[#b98a4a]" style={{ width: `${(c.views / maxCountry) * 100}%` }} />
-                </div>
-                <span className="w-10 text-right text-[0.78rem] font-medium text-[#7a6a50]">{c.views}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className={`rounded-xl border ${C.border} bg-white p-5`}>
-          <p className={labelCls}>Most read — articles & places</p>
-          {d.topContent.length === 0 && <p className="text-[0.8rem] text-[#c4b291]">No article views yet.</p>}
-          <div className="divide-y divide-[#f5edd9]">
-            {d.topContent.slice(0, 10).map((t) => (
-              <div key={`${t.kind}-${t.refId}`} className="flex items-center gap-3 py-2.5">
-                <span className={`shrink-0 rounded-full px-2 py-0.5 text-[0.58rem] font-semibold uppercase tracking-[0.12em] ${t.kind === 'story' ? 'bg-[#b98a4a]/10 text-[#a6783c]' : 'bg-[#3e7d5a]/10 text-[#3e7d5a]'}`}>
-                  {t.kind}
-                </span>
-                <span className="flex-1 truncate text-[0.82rem] text-[#2c2418]">{titleOf(t.kind, t.refId)}</span>
-                <span className="w-14 text-right text-[0.78rem] font-medium text-[#7a6a50]">{t.views} views</span>
-                <span className="w-16 text-right text-[0.74rem] text-[#a08b66]">{fmtDwell(t.avgDwell)} avg</span>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -2410,7 +2283,7 @@ export default function AdminPage() {
 
   const sectionTitle: Record<Section, string> = {
     home: 'Home', posts: 'Posts', series: 'Series', places: 'Places', journeys: 'Journeys',
-    destinations: 'Destinations', contributions: 'Contributions', insights: 'Insights', newsletter: 'Newsletter', gallery: 'Gallery', sections: 'Sections', atlas: 'Atlas', settings: 'Settings',
+    destinations: 'Destinations', contributions: 'Contributions', newsletter: 'Newsletter', gallery: 'Gallery', sections: 'Sections', atlas: 'Atlas', settings: 'Settings',
   };
   const showStatusTabs = section === 'posts' || section === 'places';
   const canCreate = section === 'posts' || section === 'series' || section === 'places' || section === 'journeys' || section === 'destinations';
@@ -2448,10 +2321,6 @@ export default function AdminPage() {
             {(contribsQ.data?.length ?? 0) > 0 && (
               <span className="rounded-full bg-[#b98a4a]/15 px-2 py-0.5 text-[0.68rem] text-[#8a6224]">{contribsQ.data?.length}</span>
             )}
-          </button>
-          <button onClick={() => goSection('insights')} className={sideBtn(section === 'insights')}>
-            {ui.globe({ className: 'h-4 w-4' })}
-            <span className="flex-1 text-left">Insights</span>
           </button>
           <button onClick={() => goSection('newsletter')} className={sideBtn(section === 'newsletter')}>
             {ui.mail({ className: 'h-4 w-4' })}
@@ -2838,13 +2707,6 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* ------------------------------ insights */}
-        {section === 'insights' && (
-          <InsightsPanel
-            stories={(storiesQ.data ?? []).map((x) => ({ id: x.id, title: x.title }))}
-            places={(placesQ.data ?? []).map((x) => ({ id: x.id, title: x.name }))}
-          />
-        )}
 
         {/* ------------------------------ newsletter */}
         {section === 'newsletter' && (

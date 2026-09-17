@@ -1,5 +1,4 @@
-import { Routes, Route, useLocation } from 'react-router'
-import { useEffect } from 'react'
+import { Routes, Route } from 'react-router'
 import { LangProvider } from './i18n'
 import { ContentProvider, ContentGate, useSiteTypography } from './content-provider'
 import Home from './pages/Home'
@@ -17,18 +16,9 @@ import Login from "./pages/Login"
 import NotFound from "./pages/NotFound"
 import ScrollToTop from './components/ScrollToTop'
 import { FontLoader } from './fonts'
-import { initAnalytics, trackPageview } from './analytics'
 
 function SiteTypography() {
   useSiteTypography();
-  return null;
-}
-
-/* records one view per route + dwell time on exit (skips /admin) */
-function AnalyticsTracker() {
-  const location = useLocation();
-  useEffect(() => initAnalytics(), []);
-  useEffect(() => trackPageview(location.pathname), [location.pathname]);
   return null;
 }
 
@@ -39,7 +29,6 @@ export default function App() {
         <SiteTypography />
         <FontLoader />
         <ScrollToTop />
-        <AnalyticsTracker />
         <Routes>
           {/* admin sits outside the content gate — it manages the content itself */}
           <Route path="/admin" element={<AdminPage />} />

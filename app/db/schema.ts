@@ -321,15 +321,3 @@ export const newsletterLogTable = mysqlTable("newsletter_log", {
 
 export type NewsletterLogRow = typeof newsletterLogTable.$inferSelect;
 
-/** Privacy-friendly analytics — one row per page view (no IPs, no cookies). */
-export const pageViewsTable = mysqlTable("page_views", {
-  id: serial("id").primaryKey(),
-  kind: varchar("kind", { length: 20 }).notNull().default("page"),
-  refId: varchar("refId", { length: 160 }).notNull().default(""),
-  path: varchar("path", { length: 255 }).notNull(),
-  country: varchar("country", { length: 8 }).notNull().default(""),
-  duration: int("duration").notNull().default(0),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
-
-export type PageViewRow = typeof pageViewsTable.$inferSelect;

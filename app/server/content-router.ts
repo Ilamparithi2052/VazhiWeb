@@ -326,16 +326,6 @@ export const contentRouter = createRouter({
     await q.deleteMedia(input.id);
     return { ok: true };
   }),
-  analyticsOverview: adminQuery.query(async () => {
-    const { analyticsOverview } = await import("./queries/analytics");
-    return analyticsOverview();
-  }),
-  contentStats: adminQuery
-    .input(z.object({ kind: z.enum(["story", "place"]), refId: z.string().max(160) }))
-    .query(async ({ input }) => {
-      const { contentStats } = await import("./queries/analytics");
-      return contentStats(input.kind, input.refId);
-    }),
 
   upsertState: adminQuery
     .input(

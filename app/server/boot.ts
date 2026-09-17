@@ -77,25 +77,6 @@ app.all("/api/newsletter/run-weekly", async (c) => {
   return c.json({ ok: true, fallback: plan.isFallback, ...result });
 });
 
-/* analytics beacon — privacy-friendly: path + coarse country + dwell time */
-app.post("/api/beacon", async (c) => {
-  try {
-    const raw = await c.req.text();
-    const v = JSON.parse(raw || "{}");
-    if (typeof v.p !== "string" || v.p.length > 250) return c.json({ ok: false }, 400);
-    const { recordView } = await import("./queries/analytics");
-    await recordView({
-      path: v.p,
-      country: typeof v.c === "string" ? v.c : "",
-      duration: Number(v.d) || 0,
-    });
-    return c.json({ ok: true });
-  } catch {
-    return c.json({ ok: false }, 400);
-  }
-});
-
-
 /* ---------------------- OG cards, RSS, sitemap, robots ---------------------- */
 
 const SITE_BASE = () => (process.env.SITE_BASE_URL || "https://vazhi.net").replace(/\/$/, "");

@@ -7,11 +7,11 @@ A long-form heritage travel blog & atlas. React 19 + Vite + Tailwind frontend; H
 | Layer | Tech |
 |---|---|
 | Frontend | React 19, TypeScript, Vite 7, Tailwind 3.4, react-router v7 |
-| API | Hono 4 + tRPC 11 (single serverless function: `api/index.ts`) |
+| API | Hono 4 + tRPC 11 (single serverless function: `api/index.ts`; app code lives in `server/`) |
 | DB | Drizzle ORM + mysql2 (`mode: "planetscale"` — TiDB-compatible) |
 | Auth | Email/password (scrypt) + Google sign-in + TOTP 2FA, JWT session cookie |
 | Images | sharp (upload compression, OG cards), Wikimedia Commons free-image search |
-| Extras | Weekly newsletter (Resend + Vercel Cron), RSS, sitemap, OG cards, analytics |
+| Extras | Weekly newsletter (Resend + Vercel Cron), RSS, sitemap, OG cards |
 
 ## Local development
 
@@ -120,7 +120,7 @@ npx drizzle-kit push           # schema → TiDB (run once per database)
 
 ## Useful routes
 
-- `/admin` — Studio (content, atlas, gallery, insights) — requires login
+- `/admin` — Studio (content, atlas, gallery) — requires login
 - `/rss.xml`, `/sitemap.xml`, `/robots.txt` — SEO
 - `/og/:kind/:id.png` — generated social cards
 - `/api/newsletter/run-weekly` — called by Vercel Cron every Sunday 09:00 IST (protected by `CRON_SECRET`)

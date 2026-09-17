@@ -8,12 +8,30 @@
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/og/(.*)", "destination": "/api/index" },
-    { "source": "/rss.xml", "destination": "/api/index" },
-    { "source": "/sitemap.xml", "destination": "/api/index" },
-    { "source": "/robots.txt", "destination": "/api/index" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/og/(.*)",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/rss.xml",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/api/index"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
   ],
   "crons": [
     {

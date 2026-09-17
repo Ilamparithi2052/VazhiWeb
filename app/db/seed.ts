@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { getDb } from "../api/queries/connection";
+import { getDb } from "../server/queries/connection";
 import {
   placeArticles,
   storiesTable,
