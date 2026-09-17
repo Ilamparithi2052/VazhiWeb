@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/png" href="/img/final/favicon.png" />
+    <link rel="apple-touch-icon" href="/img/final/favicon.png" />
+    <style>
+      #boot-splash{position:fixed;inset:0;background:#f7f1e3;display:flex;align-items:center;justify-content:center;z-index:9999;transition:opacity .4s ease}
+      #boot-splash img{width:230px;animation:vazhi-pulse 1.6s ease-in-out infinite}
+      @keyframes vazhi-pulse{0%,100%{opacity:1}50%{opacity:.55}}
+    </style>
+    <meta name="description" content="Vazhi — a travel wiki and personal atlas of places, histories, cultures and journeys." />
+    <title>Vazhi — Travel Wiki & Atlas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div id="boot-splash"><img src="/img/final/logo-black.png" alt="வழி — Vazhi" /></div>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
