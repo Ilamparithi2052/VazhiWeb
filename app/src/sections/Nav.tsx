@@ -9,6 +9,10 @@ import { useLoc } from '../content-ta';
 import { getRecent, getSaved, removeSaved } from '../lib/profile';
 import { useAuth } from '../hooks/useAuth';
 import SignInModal from '../components/SignInModal';
+import { trpc } from '@/providers/trpc';
+
+type NavItem = { id: string; label?: string; labelTa?: string; href?: string };
+const DEFAULT_MENU: NavItem[] = [{ id: 'explore' }, { id: 'stories' }, { id: 'atlas' }, { id: 'about' }];
 
 // top-level nav items route to their own pages, not home-page sections
 const linkKeys = [
@@ -46,6 +50,14 @@ export default function Nav() {
   const { isAuthenticated } = useAuth();
   const { theme, toggle } = useTheme();
   const activeTheme = useThemeValue();
+  // header chrome is configurable from Studio → Settings (stored in DB)
+  const navCfgQ = trpc.content.navConfig.useQuery();
+  const cfg = navCfgQ.data;
+  const showSearch = cfg?.showSearch ?? true;
+  const showTheme = cfg?.showTheme ?? true;
+  const showLang = cfg?.showLang ?? true;
+  const showLogin = cfg?.showLogin ?? true;
+  const menu = (cfg?.menu?.length ? cfg.menu : DEFAULT_MENU) as NavItem[];
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -172,32 +184,55 @@ export default function Nav() {
           </Link>
 
           <nav className="hidden items-center gap-7 lg:flex">
-            {/* Explore — opens the mega menu */}
-            <button
-              data-explore
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-expanded={menuOpen}
-              className={`${navLinkCls} flex items-center gap-1.5 ${menuOpen ? 'text-bronze' : ''}`}
-            >
-              {t('nav.explore')}
-              <span className={`transition-transform duration-300 ${menuOpen ? 'rotate-180' : ''}`}>
-                {ui.chevronD({ className: 'h-3 w-3' })}
-              </span>
-              <span className={`absolute -bottom-1.5 left-0 h-px bg-bronze transition-all duration-300 ${menuOpen ? 'w-full' : 'w-0 group-hover:w-full'}`} />
-            </button>
-            {linkKeys.map((l) => (
-              <Link key={l.key} to={l.to} className={navLinkCls}>
-                {t(l.key)}
-                <span className="absolute -bottom-1.5 left-0 h-px w-0 bg-bronze transition-all duration-300 group-hover:w-full" />
-              </Link>
-            ))}
-            <Link to="/about" className={navLinkCls}>
-              {t('nav.about')}
-              <span className="absolute -bottom-1.5 left-0 h-px w-0 bg-bronze transition-all duration-300 group-hover:w-full" />
-            </Link>
+            {menu.map((item) => {
+              if (item.id === 'explore' && !item.href) {
+                return (
+                  <button
+                    key="explore"
+                    data-explore
+                    onClick={() => setMenuOpen((v) => !v)}
+                    aria-expanded={menuOpen}
+                    className={`${navLinkCls} flex items-center gap-1.5 ${menuOpen ? 'text-bronze' : ''}`}
+                  >
+                    {t('nav.explore')}
+                    <span className={`transition-transform duration-300 ${menuOpen ? 'rotate-180' : ''}`}>
+                      {ui.chevronD({ className: 'h-3 w-3' })}
+                    </span>
+                    <span className={`absolute -bottom-1.5 left-0 h-px bg-bronze transition-all duration-300 ${menuOpen ? 'w-full' : 'w-0 group-hover:w-full'}`} />
+                  </button>
+                );
+              }
+              // custom item added from Studio — own label (+ optional Tamil) and link
+              if (item.href) {
+                const label = (lang === 'ta' && item.labelTa) ? item.labelTa : (item.label ?? item.id);
+                const external = /^https?:\/\//.test(item.href);
+                return external ? (
+                  <a key={item.id + item.href} href={item.href} target="_blank" rel="noreferrer" className={navLinkCls}>
+                    {label}
+                    <span className="absolute -bottom-1.5 left-0 h-px w-0 bg-bronze transition-all duration-300 group-hover:w-full" />
+                  </a>
+                ) : (
+                  <Link key={item.id + item.href} to={item.href} className={navLinkCls}>
+                    {label}
+                    <span className="absolute -bottom-1.5 left-0 h-px w-0 bg-bronze transition-all duration-300 group-hover:w-full" />
+                  </Link>
+                );
+              }
+              const link = linkKeys.find((l) => l.key === `nav.${item.id}`);
+              const to = item.id === 'about' ? '/about' : link?.to;
+              const labelKey = item.id === 'about' ? 'nav.about' : link?.key;
+              if (!to || !labelKey) return null;
+              return (
+                <Link key={item.id} to={to} className={navLinkCls}>
+                  {t(labelKey)}
+                  <span className="absolute -bottom-1.5 left-0 h-px w-0 bg-bronze transition-all duration-300 group-hover:w-full" />
+                </Link>
+              );
+            })}
           </nav>
 
           <div className="flex items-center gap-4 text-soft">
+            {showSearch && (
             <button
               aria-label={t('nav.search')}
               title={t('nav.search')}
@@ -209,8 +244,10 @@ export default function Nav() {
             >
               {ui.search({ className: 'h-[18px] w-[18px]' })}
             </button>
+            )}
 
             {/* light / dark */}
+            {showTheme && (
             <button
               aria-label={t('nav.theme')}
               title={t('nav.theme')}
@@ -221,8 +258,10 @@ export default function Nav() {
                 ? ui.sun({ className: 'h-[15px] w-[15px]' })
                 : ui.moon({ className: 'h-[15px] w-[15px]' })}
             </button>
+            )}
 
             {/* language */}
+            {showLang && (
             <div ref={langRef} className="relative">
               <button
                 aria-label={t('nav.lang')}
@@ -253,8 +292,10 @@ export default function Nav() {
                 </div>
               )}
             </div>
+            )}
 
             {/* profile */}
+            {showLogin && (
             <div ref={profileRef} className="relative">
               <button
                 aria-label={isAuthenticated ? t('nav.profile') : t('signin.open')}
@@ -300,6 +341,7 @@ export default function Nav() {
                 </div>
               )}
             </div>
+            )}
           </div>
         </div>
 

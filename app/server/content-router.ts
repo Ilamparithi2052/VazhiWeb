@@ -267,6 +267,48 @@ export const contentRouter = createRouter({
       await q.setSetting(input.key, input.value);
       return { ok: true };
     }),
+  /* navigation / header chrome — toggles + top-menu order, edited from Studio → Settings */
+  navConfig: publicQuery.query(async () => {
+    const v = await q.getSetting("nav_config");
+    if (!v) return null;
+    try {
+      const cfg = JSON.parse(v) as {
+        showLogin: boolean; showLang: boolean; showTheme: boolean; showSearch: boolean;
+        menu?: { id: string; label?: string; labelTa?: string; href?: string }[];
+        menuOrder?: string[]; // legacy shape from the first version of this panel
+      };
+      // migrate legacy { menuOrder: ["explore",...] } into the unified menu list
+      if (!cfg.menu && Array.isArray(cfg.menuOrder)) {
+        cfg.menu = cfg.menuOrder.map((id) => ({ id }));
+      }
+      return cfg;
+    }
+    catch { return null; }
+  }),
+  setNavConfig: adminQuery
+    .input(
+      z.object({
+        showLogin: z.boolean(),
+        showLang: z.boolean(),
+        showTheme: z.boolean(),
+        showSearch: z.boolean(),
+        menu: z
+          .array(
+            z.object({
+              id: z.string().min(1).max(40),
+              label: z.string().max(60).optional(),
+              labelTa: z.string().max(120).optional(),
+              href: z.string().max(300).optional(),
+            }),
+          )
+          .min(1)
+          .max(10),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      await q.setSetting("nav_config", JSON.stringify(input));
+      return { ok: true };
+    }),
   uploadFont: adminQuery
     .input(
       z.object({

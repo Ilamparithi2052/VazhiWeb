@@ -589,13 +589,35 @@ interface PlaceForm {
   lat: string;
   lng: string;
   contributors: Contributor[];
+  // Tamil translation — sections/facts kept from the loaded record, editable fields below
+  taName: string;
+  taRegion: string;
+  taCountry: string;
+  taSummary: string;
+  taSections?: PlaceSection[];
+  taFacts?: WikiFact[];
 }
 
 const emptyPlace = (): PlaceForm => ({
   id: '', name: '', region: '', country: '', destId: 'india', type: 'Heritage',
   img: '', summary: '', sections: [{ heading: 'Overview', body: '' }], facts: [], related: [],
   address: '', lat: '', lng: '', contributors: [],
+  taName: '', taRegion: '', taCountry: '', taSummary: '',
 });
+
+/** Builds the place.ta payload from form fields, preserving existing Tamil sections/facts. */
+function placeTaFromForm(f: PlaceForm) {
+  const hasText = f.taName.trim() || f.taRegion.trim() || f.taCountry.trim() || f.taSummary.trim();
+  if (!hasText && !f.taSections?.length && !f.taFacts?.length) return null;
+  return {
+    name: f.taName.trim() || f.name,
+    region: f.taRegion.trim() || f.region,
+    country: f.taCountry.trim() || f.country,
+    summary: f.taSummary.trim() || f.summary,
+    ...(f.taSections?.length ? { sections: f.taSections } : {}),
+    ...(f.taFacts?.length ? { facts: f.taFacts } : {}),
+  };
+}
 
 /** Compact contributor list editor for the settings rail (posts + places). */
 function ContributorsRail({ value, onChange }: { value: Contributor[]; onChange: (v: Contributor[]) => void }) {
@@ -752,6 +774,21 @@ function PlaceEditor({
           }
         />
       </div>
+
+      <details className={`rounded-2xl border ${C.border} bg-white px-6 py-5`}>
+        <summary className="cursor-pointer font-display text-lg text-[#2c2418]">தமிழ் translation (optional)</summary>
+        <p className="mb-4 mt-1 text-[0.78rem] leading-relaxed text-[#a08b66]">
+          Shown when a visitor switches the site to Tamil. Fields left empty fall back to English — saving here never deletes an existing translation.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Name (Tamil)"><TextInput value={form.taName} onChange={(e) => set('taName', e.target.value)} placeholder={form.name || 'தமிழ் பெயர்'} /></Field>
+          <Field label="Region (Tamil)"><TextInput value={form.taRegion} onChange={(e) => set('taRegion', e.target.value)} placeholder={form.region || 'தமிழ் பிரதேசம்'} /></Field>
+          <Field label="Country (Tamil)"><TextInput value={form.taCountry} onChange={(e) => set('taCountry', e.target.value)} placeholder={form.country || 'தமிழ் நாடு'} /></Field>
+        </div>
+        <div className="mt-4">
+          <Field label="Summary (Tamil)"><TextArea rows={3} value={form.taSummary} onChange={(e) => set('taSummary', e.target.value)} placeholder="தமிழ் சுருக்கம்…" /></Field>
+        </div>
+      </details>
     </div>
   );
 }
@@ -771,12 +808,36 @@ interface StoryForm {
   seoTitle: string;
   seoDescription: string;
   seoKeywords: string;
+  // Tamil translation (optional)
+  taTitle: string;
+  taTime: string;
+  taLede: string;
+  taBody: string;
 }
 
 const emptyStory = (): StoryForm => ({
   id: '', tag: 'Essay', title: '', time: '5 min read', img: '', placeId: '', lede: '', body: '',
   seriesSlug: '', relatedPlaces: [], contributors: [], seoTitle: '', seoDescription: '', seoKeywords: '',
+  taTitle: '', taTime: '', taLede: '', taBody: '',
 });
+
+/** Builds the story.ta payload; empty form = no translation stored (existing one is preserved by pre-fill). */
+function storyTaFromForm(f: StoryForm) {
+  const has = f.taTitle.trim() || f.taLede.trim() || f.taBody.trim();
+  if (!has) return null;
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const rawBody = f.taBody.trim();
+  // plain-text paragraphs become HTML; content that already looks like HTML is kept as-is
+  const body = rawBody
+    ? (/<[a-z][\s\S]*>/i.test(rawBody) ? rawBody : rawBody.split(/\n+/).filter(Boolean).map((p) => `<p>${esc(p)}</p>`).join(''))
+    : f.body;
+  return {
+    title: f.taTitle.trim() || f.title,
+    time: f.taTime.trim() || f.time,
+    lede: f.taLede.trim() || f.lede,
+    body,
+  };
+}
 
 const slugify = (s: string) =>
   s.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80);
@@ -952,6 +1013,25 @@ function StoryEditor({
         minHeight={460}
         onEditor={onEditor}
       />
+
+      <details className={`mt-6 rounded-xl border ${C.borderSoft} bg-[#fdfaf3] px-5 py-4`}>
+        <summary className="cursor-pointer font-display text-base text-[#2c2418]">தமிழ் translation (optional)</summary>
+        <p className="mb-3 mt-1 text-[0.76rem] leading-relaxed text-[#a08b66]">
+          Shown when a visitor switches to Tamil. Empty fields fall back to English — saving never deletes an existing translation.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
+          <TextInput value={form.taTitle} onChange={(e) => set('taTitle', e.target.value)} placeholder={form.title || 'தமிழ் தலைப்பு'} />
+          <TextInput value={form.taTime} onChange={(e) => set('taTime', e.target.value)} placeholder={form.time || '5 நிமிடம்'} />
+        </div>
+        <TextArea rows={2} value={form.taLede} onChange={(e) => set('taLede', e.target.value)} placeholder="தமிழ் அறிமுக வரி…" className="mt-3" />
+        <TextArea
+          rows={8}
+          value={form.taBody}
+          onChange={(e) => set('taBody', e.target.value)}
+          placeholder="தமிழ் கட்டுரை — plain text, one paragraph per line…"
+          className="mt-3 font-body"
+        />
+      </details>
     </div>
   );
 }
@@ -974,8 +1054,8 @@ function JourneyEditor({ form, setForm }: { form: JourneyForm; setForm: (f: Jour
   );
 }
 
-interface DestForm { id: string; name: string; places: string; img: string; blurb: string; mapImg: string; }
-const emptyDest = (): DestForm => ({ id: '', name: '', places: '0 Places', img: '', blurb: '', mapImg: '' });
+interface DestForm { id: string; name: string; places: string; img: string; blurb: string; mapImg: string; taName: string; taPlacesLabel: string; taBlurb: string; }
+const emptyDest = (): DestForm => ({ id: '', name: '', places: '0 Places', img: '', blurb: '', mapImg: '', taName: '', taPlacesLabel: '', taBlurb: '' });
 
 function DestEditor({ form, setForm, isNew }: { form: DestForm; setForm: (f: DestForm) => void; isNew: boolean }) {
   const set = <K extends keyof DestForm>(k: K, v: DestForm[K]) => setForm({ ...form, [k]: v });
@@ -989,6 +1069,14 @@ function DestEditor({ form, setForm, isNew }: { form: DestForm; setForm: (f: Des
         <Field label="Map image"><TextInput value={form.mapImg} onChange={(e) => set('mapImg', e.target.value)} /></Field>
       </div>
       <Field label="Blurb"><TextArea rows={2} value={form.blurb} onChange={(e) => set('blurb', e.target.value)} /></Field>
+      <details className={`rounded-xl border ${C.borderSoft} bg-[#fdfaf3] px-4 py-3`}>
+        <summary className="cursor-pointer font-display text-base text-[#2c2418]">தமிழ் translation (optional)</summary>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          <Field label="Name (Tamil)"><TextInput value={form.taName} onChange={(e) => set('taName', e.target.value)} placeholder={form.name || 'தமிழ் பெயர்'} /></Field>
+          <Field label="Places label (Tamil)"><TextInput value={form.taPlacesLabel} onChange={(e) => set('taPlacesLabel', e.target.value)} placeholder="2,154 இடங்கள்" /></Field>
+        </div>
+        <div className="mt-3"><Field label="Blurb (Tamil)"><TextArea rows={2} value={form.taBlurb} onChange={(e) => set('taBlurb', e.target.value)} /></Field></div>
+      </details>
     </div>
   );
 }
@@ -1051,6 +1139,118 @@ function useSectionContent<T extends Record<string, unknown>>(key: 'home_hero' |
   });
   const current = (q.data?.[key] ?? {}) as Partial<T>;
   return { current, save: (value: T) => saveM.mutate({ key, value: JSON.stringify(value) }), saving: saveM.isPending, saved: saveM.isSuccess };
+}
+
+/** Navigation & header editor — toggles for header buttons + top-menu items (built-in + custom). */
+type NavMenuItem = { id: string; label?: string; labelTa?: string; href?: string };
+const BUILTIN_LABELS: Record<string, string> = { explore: 'Explore (mega menu)', stories: 'Stories', atlas: 'Atlas', about: 'About' };
+function NavConfigEditor() {
+  const utils = trpc.useUtils();
+  const cfgQ = trpc.content.navConfig.useQuery();
+  const saveM = trpc.content.setNavConfig.useMutation({ onSuccess: () => utils.content.navConfig.invalidate() });
+  const [form, setForm] = useState<{ showLogin: boolean; showLang: boolean; showTheme: boolean; showSearch: boolean; menu: NavMenuItem[] } | null>(null);
+  const [newItem, setNewItem] = useState({ label: '', labelTa: '', href: '' });
+  useEffect(() => {
+    if (!form && cfgQ.data !== undefined) {
+      setForm({
+        showLogin: cfgQ.data?.showLogin ?? true,
+        showLang: cfgQ.data?.showLang ?? true,
+        showTheme: cfgQ.data?.showTheme ?? true,
+        showSearch: cfgQ.data?.showSearch ?? true,
+        menu: (cfgQ.data?.menu?.length ? cfgQ.data.menu : [{ id: 'explore' }, { id: 'stories' }, { id: 'atlas' }, { id: 'about' }]) as NavMenuItem[],
+      });
+    }
+  }, [cfgQ.data, form]);
+  if (!form) return null;
+  const set = (k: 'showLogin' | 'showLang' | 'showTheme' | 'showSearch', v: boolean) => setForm({ ...form, [k]: v });
+  const move = (i: number, dir: -1 | 1) => {
+    const j = i + dir;
+    if (j < 0 || j >= form.menu.length) return;
+    const next = [...form.menu];
+    [next[i], next[j]] = [next[j], next[i]];
+    setForm({ ...form, menu: next });
+  };
+  const itemName = (it: NavMenuItem) => it.href ? (it.label || it.href) : (BUILTIN_LABELS[it.id] ?? it.id);
+  const addCustom = () => {
+    const label = newItem.label.trim();
+    const href = newItem.href.trim();
+    if (!label || !href) return;
+    const id = 'custom-' + label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 24) || `custom-${Date.now()}`;
+    setForm({ ...form, menu: [...form.menu, { id, label, labelTa: newItem.labelTa.trim() || undefined, href }] });
+    setNewItem({ label: '', labelTa: '', href: '' });
+  };
+  const Toggle = ({ k, label, hint }: { k: 'showLogin' | 'showLang' | 'showTheme' | 'showSearch'; label: string; hint: string }) => (
+    <button
+      type="button"
+      onClick={() => set(k, !form[k])}
+      className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-colors ${form[k] ? 'border-[#b98a4a]/50 bg-[#f5edd9]' : 'border-[#e3d5b8] bg-white'}`}
+    >
+      <span>
+        <span className="block text-[0.85rem] font-medium text-[#2c2418]">{label}</span>
+        <span className="block text-[0.72rem] text-[#a08b66]">{hint}</span>
+      </span>
+      <span className={`ml-4 inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors ${form[k] ? 'bg-[#b98a4a] justify-end' : 'bg-[#d9cba8] justify-start'}`}>
+        <span className="h-5 w-5 rounded-full bg-white shadow" />
+      </span>
+    </button>
+  );
+  return (
+    <div className={`rounded-2xl border ${C.border} bg-white p-6 md:p-8`}>
+      <h2 className="font-display text-xl text-[#2c2418]">Navigation & header</h2>
+      <p className={`mt-2 text-[0.85rem] leading-relaxed ${C.soft}`}>
+        Control what appears in the top bar of the live site — no code changes needed. Changes apply instantly after saving.
+      </p>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <Toggle k="showLogin" label="Sign-in / profile button" hint="The round person icon. Hide it if membership is not needed yet." />
+        <Toggle k="showLang" label="Language switcher (EN / தமிழ்)" hint="Hide until your Tamil translations are ready." />
+        <Toggle k="showTheme" label="Night / day toggle" hint="The moon-sun button that switches dark and light themes." />
+        <Toggle k="showSearch" label="Search button" hint="The magnifier that opens site-wide search." />
+      </div>
+      <div className="mt-6">
+        <p className={miniLabel}>Main menu items (left to right)</p>
+        <div className="space-y-2">
+          {form.menu.map((it, i) => (
+            <div key={`${it.id}-${it.href ?? ''}`} className={`flex items-center gap-2 rounded-lg border ${C.border} bg-[#fdfaf3] px-3 py-2`}>
+              <span className="flex-1 text-[0.85rem] text-[#2c2418]">
+                {itemName(it)}
+                {it.href && <span className="ml-2 text-[0.68rem] text-[#a08b66]">→ {it.href}{it.labelTa ? ` · தமிழ்: ${it.labelTa}` : ''}</span>}
+              </span>
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="rounded-md border border-[#e3d5b8] px-2 py-0.5 text-[#a6783c] disabled:opacity-30">↑</button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === form.menu.length - 1} className="rounded-md border border-[#e3d5b8] px-2 py-0.5 text-[#a6783c] disabled:opacity-30">↓</button>
+              {it.href ? (
+                <button type="button" onClick={() => setForm({ ...form, menu: form.menu.filter((_, j) => j !== i) })} className="rounded-md border border-[#c05f4e]/40 px-2 py-0.5 text-[#c05f4e]">✕</button>
+              ) : (
+                <span title="Built-in item — cannot be removed, only reordered" className="px-1 text-[0.62rem] uppercase tracking-[0.1em] text-[#c4b291]">built-in</span>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className={`mt-4 rounded-xl border ${C.borderSoft} bg-[#fdfaf3] p-4`}>
+          <p className={miniLabel}>Add a custom menu item</p>
+          <div className="grid gap-2 sm:grid-cols-[1fr_1fr]">
+            <TextInput value={newItem.label} onChange={(e) => setNewItem({ ...newItem, label: e.target.value })} placeholder="Label (English) — e.g. Gallery" />
+            <TextInput value={newItem.labelTa} onChange={(e) => setNewItem({ ...newItem, labelTa: e.target.value })} placeholder="Label (Tamil, optional)" />
+          </div>
+          <div className="mt-2 flex gap-2">
+            <TextInput value={newItem.href} onChange={(e) => setNewItem({ ...newItem, href: e.target.value })} placeholder="Link — /stories or https://…" className="flex-1" />
+            <button type="button" onClick={addCustom} disabled={!newItem.label.trim() || !newItem.href.trim()} className="shrink-0 rounded-full border border-[#b98a4a]/50 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[#a6783c] transition-colors hover:border-[#b98a4a] disabled:opacity-40">
+              + Add
+            </button>
+          </div>
+          <p className="mt-2 text-[0.72rem] leading-relaxed text-[#a08b66]">
+            Use a site path like <code className="rounded bg-[#f5edd9] px-1">/stories</code> or a full URL like <code className="rounded bg-[#f5edd9] px-1">https://instagram.com/…</code> (opens in a new tab). Custom items can be removed; the four built-in items are fixed.
+          </p>
+        </div>
+      </div>
+      <div className="mt-5 flex items-center gap-3">
+        <button onClick={() => saveM.mutate(form)} disabled={saveM.isPending} className="rounded-full bg-[#2c2418] px-5 py-2 text-[0.7rem] font-semibold uppercase tracking-[0.16em] text-[#f0e6d2] transition-colors hover:bg-[#3a2c17] disabled:opacity-50">
+          {saveM.isPending ? 'Saving…' : 'Save navigation'}
+        </button>
+        {saveM.isSuccess && <span className="text-[0.78rem] font-medium text-[#3e7d5a]">Saved — live on the site header.</span>}
+        {saveM.isError && <span className="text-[0.78rem] font-medium text-[#c05f4e]">{saveM.error.message}</span>}
+      </div>
+    </div>
+  );
 }
 
 /** Hero editor — image, headline lines, subline, search placeholder, popular chips, featured place. */
@@ -1702,7 +1902,7 @@ export default function AdminPage() {
     if (ed.section === 'posts') {
       const s = ed.key === null ? null : storiesQ.data?.find((x) => x.id === ed.key);
       setStoryFormS(s
-        ? { id: s.id, tag: s.tag, title: s.title, time: s.time, img: s.img, placeId: s.placeId ?? '', lede: s.lede, body: toHtml(s.body), seriesSlug: s.seriesSlug ?? '', relatedPlaces: s.relatedPlaces ?? [], contributors: s.contributors ?? [], seoTitle: s.seoTitle ?? '', seoDescription: s.seoDescription ?? '', seoKeywords: s.seoKeywords ?? '' }
+        ? { id: s.id, tag: s.tag, title: s.title, time: s.time, img: s.img, placeId: s.placeId ?? '', lede: s.lede, body: toHtml(s.body), seriesSlug: s.seriesSlug ?? '', relatedPlaces: s.relatedPlaces ?? [], contributors: s.contributors ?? [], seoTitle: s.seoTitle ?? '', seoDescription: s.seoDescription ?? '', seoKeywords: s.seoKeywords ?? '', taTitle: s.ta?.title ?? '', taTime: s.ta?.time ?? '', taLede: s.ta?.lede ?? '', taBody: s.ta ? toHtml(s.ta.body) : '' }
         : emptyStory());
     }
     if (ed.section === 'series') {
@@ -1714,7 +1914,7 @@ export default function AdminPage() {
     if (ed.section === 'places') {
       const p = ed.key === null ? null : placesQ.data?.find((x) => x.id === ed.key);
       setPlaceFormS(p
-        ? { id: p.id, name: p.name, region: p.region, country: p.country, destId: p.destId, type: p.type, img: p.img, summary: p.summary, sections: p.sections.map((x) => ({ heading: x.heading, body: toHtml(x.body) })), facts: p.facts, related: p.related, address: p.address ?? '', lat: p.lat != null ? String(p.lat) : '', lng: p.lng != null ? String(p.lng) : '', contributors: p.contributors ?? [] }
+        ? { id: p.id, name: p.name, region: p.region, country: p.country, destId: p.destId, type: p.type, img: p.img, summary: p.summary, sections: p.sections.map((x) => ({ heading: x.heading, body: toHtml(x.body) })), facts: p.facts, related: p.related, address: p.address ?? '', lat: p.lat != null ? String(p.lat) : '', lng: p.lng != null ? String(p.lng) : '', contributors: p.contributors ?? [], taName: p.ta?.name ?? '', taRegion: p.ta?.region ?? '', taCountry: p.ta?.country ?? '', taSummary: p.ta?.summary ?? '', taSections: p.ta?.sections?.map((x) => ({ heading: x.heading, body: toHtml(x.body) })), taFacts: p.ta?.facts }
         : emptyPlace());
     }
     if (ed.section === 'journeys') {
@@ -1724,7 +1924,7 @@ export default function AdminPage() {
     if (ed.section === 'destinations') {
       const d = ed.key === null ? null : destsQ.data?.find((x) => x.id === ed.key);
       setDestFormS(d
-        ? { id: d.id, name: d.name, places: d.places, img: d.img, blurb: d.blurb, mapImg: d.mapImg ?? '' }
+        ? { id: d.id, name: d.name, places: d.places, img: d.img, blurb: d.blurb, mapImg: d.mapImg ?? '', taName: d.taName ?? '', taPlacesLabel: d.taPlacesLabel ?? '', taBlurb: d.taBlurb ?? '' }
         : emptyDest());
     }
   };
@@ -1792,7 +1992,7 @@ export default function AdminPage() {
     const isNew = editing.key === null;
     if (editing.section === 'posts' && storyForm) {
       upsertStory.mutate(
-        { ...storyForm, placeId: storyForm.placeId || null, seriesSlug: storyForm.seriesSlug || null, contributors: storyForm.contributors.filter((c) => c.name.trim()), ta: null, status: publish ? 'published' : isNew ? 'draft' : undefined, reason: publish ? 'publish' as const : 'manual' as const },
+        { ...storyForm, placeId: storyForm.placeId || null, seriesSlug: storyForm.seriesSlug || null, contributors: storyForm.contributors.filter((c) => c.name.trim()), ta: storyTaFromForm(storyForm), status: publish ? 'published' : isNew ? 'draft' : undefined, reason: publish ? 'publish' as const : 'manual' as const },
         {
           onSuccess: () => {
             // the record now exists — switch the editor to it so autosave engages
@@ -1811,7 +2011,7 @@ export default function AdminPage() {
           lat: placeForm.lat.trim() ? Number(placeForm.lat) : null,
           lng: placeForm.lng.trim() ? Number(placeForm.lng) : null,
           contributors: placeForm.contributors.filter((c) => c.name.trim()),
-          ta: null,
+          ta: placeTaFromForm(placeForm),
           status: publish ? 'published' : isNew ? 'draft' : undefined,
         },
         {
@@ -1839,7 +2039,7 @@ export default function AdminPage() {
     }
     if (editing.section === 'destinations' && destForm) {
       upsertDest.mutate(
-        { ...destForm, mapImg: destForm.mapImg || null, taName: null, taPlacesLabel: null, taBlurb: null },
+        { ...destForm, mapImg: destForm.mapImg || null, taName: destForm.taName.trim() || null, taPlacesLabel: destForm.taPlacesLabel.trim() || null, taBlurb: destForm.taBlurb.trim() || null },
         { onSuccess: () => { if (isNew) setEditing({ ...editing, key: destForm.id, status: 'draft' }); } },
       );
     }
@@ -1854,7 +2054,7 @@ export default function AdminPage() {
     if (validate()) return; // don't autosave invalid content
     setSaveState('saving');
     upsertStory.mutate(
-      { ...form, placeId: form.placeId || null, seriesSlug: form.seriesSlug || null, contributors: form.contributors.filter((c) => c.name.trim()), ta: null, reason: 'auto' as const },
+      { ...form, placeId: form.placeId || null, seriesSlug: form.seriesSlug || null, contributors: form.contributors.filter((c) => c.name.trim()), ta: storyTaFromForm(form), reason: 'auto' as const },
       {
         onSuccess: () => {
           setSaveState('saved');
@@ -2758,6 +2958,7 @@ export default function AdminPage() {
         {/* ------------------------------ settings */}
         {section === 'settings' && (
           <div className="mt-7 max-w-[720px] space-y-6">
+            <NavConfigEditor />
             <div className={`rounded-2xl border ${C.border} bg-white p-6 md:p-8`}>
               <div className="flex items-center gap-3">
                 <span className="text-[#b98a4a]">{ico.image('h-5 w-5')}</span>

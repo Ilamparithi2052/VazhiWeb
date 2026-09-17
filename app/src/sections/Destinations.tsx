@@ -42,7 +42,6 @@ export default function Destinations() {
                   <img
                     src={IMG(d.img)}
                     alt={(lang === 'ta' ? destTa[d.id]?.name : undefined) ?? d.name}
-                    loading="lazy"
                     className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.06]"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#120d08]/85 via-[#120d08]/20 to-transparent opacity-80 transition-opacity group-hover:opacity-100" />
