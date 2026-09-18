@@ -500,6 +500,7 @@ export interface StoryTa {
   time: string;
   lede: string;
   body: RichBody;
+  tag?: string;
 }
 
 export const storiesTa: Record<string, StoryTa> = {
@@ -650,7 +651,7 @@ export function locStoryFrom(
   if (lang === 'en') return base;
   const ta = storiesTa[id];
   if (!ta) return base;
-  return { ...base, title: ta.title, time: ta.time, lede: ta.lede, body: ta.body };
+  return { ...base, title: ta.title, time: ta.time, lede: ta.lede, body: ta.body, tag: ta.tag ?? base.tag };
 }
 
 /** Hook: returns stable localizer functions bound to the loaded content. */

@@ -14,6 +14,9 @@ const contributorSchema = z.object({
   bio: z.string().optional(),
   photo: z.string().optional(),
   link: z.string().optional(),
+  photoZoom: z.number().min(1).max(4).optional(),
+  photoX: z.number().min(0).max(100).optional(),
+  photoY: z.number().min(0).max(100).optional(),
 });
 
 const placeTaSchema = z.object({
@@ -50,6 +53,7 @@ const storyTaSchema = z.object({
   time: z.string(),
   lede: z.string(),
   body: richText,
+  tag: z.string().optional(),
 });
 
 const storyInput = z.object({

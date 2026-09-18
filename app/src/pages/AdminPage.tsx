@@ -10,6 +10,29 @@ import MediaDialog from '../components/editor/MediaDialog';
 import type { Editor } from '@tiptap/react';
 import { toHtml } from '../richtext';
 
+/** English / தமிழ் editing toggle — switches the whole editor surface between the two language versions. */
+function LangToggle({ lang, onChange }: { lang: 'en' | 'ta'; onChange: (l: 'en' | 'ta') => void }) {
+  return (
+    <div className="mb-5 inline-flex items-center gap-1 rounded-full border border-[#b98a4a]/40 bg-[#f5edd9] p-1">
+      {(['en', 'ta'] as const).map((l) => (
+        <button
+          key={l}
+          type="button"
+          onClick={() => onChange(l)}
+          className={`rounded-full px-4 py-1.5 text-[0.68rem] font-semibold uppercase tracking-[0.16em] transition-colors ${
+            lang === l ? 'bg-[#2c2418] text-[#f0e6d2]' : 'text-[#a6783c] hover:text-[#2c2418]'
+          }`}
+        >
+          {l === 'en' ? 'English' : 'தமிழ்'}
+        </button>
+      ))}
+      <span className="hidden pl-2 pr-1 text-[0.68rem] text-[#a08b66] sm:inline">
+        {lang === 'ta' ? 'editing the Tamil version' : 'editing the English version'}
+      </span>
+    </div>
+  );
+}
+
 /* ================================================================== types */
 
 type Section = 'home' | 'posts' | 'series' | 'places' | 'journeys' | 'destinations' | 'contributions' | 'newsletter' | 'gallery' | 'sections' | 'atlas' | 'settings';
@@ -608,15 +631,102 @@ const emptyPlace = (): PlaceForm => ({
 /** Builds the place.ta payload from form fields, preserving existing Tamil sections/facts. */
 function placeTaFromForm(f: PlaceForm) {
   const hasText = f.taName.trim() || f.taRegion.trim() || f.taCountry.trim() || f.taSummary.trim();
-  if (!hasText && !f.taSections?.length && !f.taFacts?.length) return null;
+  // mirrored-but-unfilled Tamil sections/facts must not override the English fallback
+  const taSecs = (f.taSections ?? []).filter((s) => s.heading.trim() || (typeof s.body === 'string' ? s.body.replace(/<[^>]*>/g, '').trim() : s.body));
+  if (!hasText && !taSecs.length && !f.taFacts?.length) return null;
   return {
     name: f.taName.trim() || f.name,
     region: f.taRegion.trim() || f.region,
     country: f.taCountry.trim() || f.country,
     summary: f.taSummary.trim() || f.summary,
-    ...(f.taSections?.length ? { sections: f.taSections } : {}),
+    ...(taSecs.length ? { sections: taSecs } : {}),
     ...(f.taFacts?.length ? { facts: f.taFacts } : {}),
   };
+}
+
+/**
+ * Photo framing tool — live circular preview of a contributor photo.
+ * Drag on the preview to reposition, use the slider to zoom. Stored as zoom + focal %.
+ */
+function PhotoAdjust({ c, onChange }: { c: Contributor; onChange: (patch: Partial<Contributor>) => void }) {
+  const zoom = c.photoZoom ?? 1;
+  const x = c.photoX ?? 50;
+  const y = c.photoY ?? 50;
+  const ref = useRef<HTMLSpanElement>(null);
+  const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLSpanElement>) => {
+    e.preventDefault();
+    ref.current?.setPointerCapture(e.pointerId);
+    drag.current = { px: e.clientX, py: e.clientY, x, y };
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLSpanElement>) => {
+    const d = drag.current;
+    const el = ref.current;
+    if (!d || !el) return;
+    const size = el.getBoundingClientRect().width || 1;
+    // dragging the image right should reveal more of its left side → focal x decreases
+    const nx = Math.min(100, Math.max(0, d.x - ((e.clientX - d.px) / size) * 100 * zoom));
+    const ny = Math.min(100, Math.max(0, d.y - ((e.clientY - d.py) / size) * 100 * zoom));
+    onChange({ photoX: Math.round(nx), photoY: Math.round(ny) });
+  };
+  const onPointerUp = () => { drag.current = null; };
+
+  return (
+    <div className={`rounded-lg border ${C.borderSoft} bg-white p-3`}>
+      <div className="flex items-center gap-3">
+        <span
+          ref={ref}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          className="block h-20 w-20 shrink-0 cursor-grab touch-none overflow-hidden rounded-full border border-[#ddcdab] active:cursor-grabbing"
+          title="Drag to reposition"
+        >
+          <img
+            src={IMG(c.photo!)}
+            alt=""
+            draggable={false}
+            className="h-full w-full object-cover"
+            style={{
+              objectPosition: `${x}% ${y}%`,
+              ...(zoom > 1 ? { transform: `scale(${zoom})` } : {}),
+            }}
+          />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="mb-1 text-[0.62rem] font-semibold uppercase tracking-[0.14em] text-[#a08b66]">
+            Frame the photo — drag the circle, zoom below
+          </p>
+          <input
+            type="range"
+            min={1}
+            max={3}
+            step={0.05}
+            value={zoom}
+            onChange={(e) => onChange({ photoZoom: Number(e.target.value) })}
+            className="w-full accent-[#8a6224]"
+          />
+          <div className="mt-1 flex items-center justify-between">
+            <span className="text-[0.68rem] text-[#a08b66]">Zoom {zoom.toFixed(2)}×</span>
+            {(zoom !== 1 || x !== 50 || y !== 50) && (
+              <button
+                type="button"
+                onClick={() => onChange({ photoZoom: undefined, photoX: undefined, photoY: undefined })}
+                className="text-[0.62rem] uppercase tracking-[0.12em] text-[#c05f4e] hover:underline"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+      <p className="mt-2 text-[0.68rem] leading-relaxed text-[#a08b66]">
+        The circle is exactly how the photo will appear on the page.
+      </p>
+    </div>
+  );
 }
 
 /** Compact contributor list editor for the settings rail (posts + places). */
@@ -645,6 +755,7 @@ function ContributorsRail({ value, onChange }: { value: Contributor[]; onChange:
             <TextInput value={c.role ?? ''} onChange={(e) => setC(i, { role: e.target.value })} placeholder="Role (e.g. Field researcher)" />
             <TextArea rows={2} value={c.bio ?? ''} onChange={(e) => setC(i, { bio: e.target.value })} placeholder="One or two lines about them…" />
             <ImagePickField value={c.photo ?? ''} onChange={(v) => setC(i, { photo: v })} placeholder="Photo — pick from gallery or paste a URL (optional)" />
+            {c.photo && <PhotoAdjust c={c} onChange={(patch) => setC(i, patch)} />}
             <TextInput value={c.link ?? ''} onChange={(e) => setC(i, { link: e.target.value })} placeholder="External link (optional)" />
           </div>
         ))}
@@ -669,8 +780,12 @@ function PlaceEditor({
   setRail: (r: React.ReactNode) => void;
 }) {
   const set = <K extends keyof PlaceForm>(k: K, v: PlaceForm[K]) => setForm({ ...form, [k]: v });
+  const [lang, setLang] = useState<'en' | 'ta'>('en');
+  const taMode = lang === 'ta';
   const setSection = (i: number, sc: PlaceSection) =>
     set('sections', form.sections.map((x, j) => (j === i ? sc : x)));
+  const setTaSection = (i: number, sc: PlaceSection) =>
+    set('taSections', (form.taSections ?? []).map((x, j) => (j === i ? sc : x)));
 
   // settings live in the right rail (Wix/WordPress style)
   useEffect(() => {
@@ -686,8 +801,17 @@ function PlaceEditor({
             <option>Nature</option>
           </select>
         </Field>
-        <Field label="Region"><TextInput value={form.region} onChange={(e) => set('region', e.target.value)} /></Field>
-        <Field label="Country"><TextInput value={form.country} onChange={(e) => set('country', e.target.value)} /></Field>
+        {taMode ? (
+          <>
+            <Field label="Region (தமிழ்)"><TextInput value={form.taRegion} onChange={(e) => set('taRegion', e.target.value)} placeholder={form.region || 'தமிழ் பிரதேசம்'} /></Field>
+            <Field label="Country (தமிழ்)"><TextInput value={form.taCountry} onChange={(e) => set('taCountry', e.target.value)} placeholder={form.country || 'தமிழ் நாடு'} /></Field>
+          </>
+        ) : (
+          <>
+            <Field label="Region"><TextInput value={form.region} onChange={(e) => set('region', e.target.value)} /></Field>
+            <Field label="Country"><TextInput value={form.country} onChange={(e) => set('country', e.target.value)} /></Field>
+          </>
+        )}
         <Field label="Destination id"><TextInput value={form.destId} onChange={(e) => set('destId', e.target.value)} /></Field>
         <Field label="Image"><ImagePickField value={form.img} onChange={(v) => set('img', v)} /></Field>
         {form.img && <img src={IMG(form.img)} alt="" className={`h-28 w-full rounded-lg border ${C.border} object-cover`} />}
@@ -711,84 +835,138 @@ function PlaceEditor({
       </div>,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, isNew]);
+  }, [form, isNew, lang]);
 
   return (
-    <div className="space-y-6">
-      <div className={`rounded-2xl border ${C.border} bg-white px-6 py-6 md:px-9 md:py-7`}>
-        <input
-          value={form.name}
-          onChange={(e) => set('name', e.target.value)}
-          placeholder="Place name"
-          className="w-full bg-transparent font-display text-3xl text-[#2c2418] outline-none placeholder:text-[#c4b291]"
-        />
-        <textarea
-          rows={3}
-          value={form.summary}
-          onChange={(e) => set('summary', e.target.value)}
-          placeholder="Summary — the italic standfirst that opens the page…"
-          className="mt-3 w-full resize-y bg-transparent text-[1.02rem] italic leading-relaxed text-[#7a6a50] outline-none placeholder:text-[#c4b291]"
-        />
-      </div>
+    <div>
+      <LangToggle lang={lang} onChange={setLang} />
+      <div className="space-y-6">
+        <div className={`rounded-2xl border ${C.border} bg-white px-6 py-6 md:px-9 md:py-7`}>
+          {taMode && (
+            <p className="mb-4 rounded-lg border border-[#b98a4a]/30 bg-[#f5edd9] px-3 py-2 text-[0.74rem] leading-relaxed text-[#7a6a50]">
+              தமிழ் பதிப்பு — you are editing the Tamil version of this place. Empty fields fall back to English; saving stores both versions together.
+            </p>
+          )}
+          <input
+            key={`name-${lang}`}
+            value={taMode ? form.taName : form.name}
+            onChange={(e) => (taMode ? set('taName', e.target.value) : set('name', e.target.value))}
+            placeholder={taMode ? 'தமிழ் பெயர்' : 'Place name'}
+            className="w-full bg-transparent font-display text-3xl text-[#2c2418] outline-none placeholder:text-[#c4b291]"
+          />
+          <textarea
+            key={`summary-${lang}`}
+            rows={3}
+            value={taMode ? form.taSummary : form.summary}
+            onChange={(e) => (taMode ? set('taSummary', e.target.value) : set('summary', e.target.value))}
+            placeholder={taMode ? 'தமிழ் சுருக்கம் — பக்கத்தைத் திறக்கும் சாய்வு வரி…' : 'Summary — the italic standfirst that opens the page…'}
+            className="mt-3 w-full resize-y bg-transparent text-[1.02rem] italic leading-relaxed text-[#7a6a50] outline-none placeholder:text-[#c4b291]"
+          />
+        </div>
 
-      <div className="space-y-5">
-        {form.sections.map((sc, i) => (
-          <div key={i} className={`rounded-2xl border ${C.border} bg-[#fdfaf3] p-4 md:p-5`}>
-            <div className="mb-3 flex items-center gap-3">
-              <TextInput value={sc.heading} onChange={(e) => setSection(i, { ...sc, heading: e.target.value })} placeholder="Section heading" />
+        {!taMode ? (
+          <div className="space-y-5">
+            {form.sections.map((sc, i) => (
+              <div key={i} className={`rounded-2xl border ${C.border} bg-[#fdfaf3] p-4 md:p-5`}>
+                <div className="mb-3 flex items-center gap-3">
+                  <TextInput value={sc.heading} onChange={(e) => setSection(i, { ...sc, heading: e.target.value })} placeholder="Section heading" />
+                  <button
+                    type="button"
+                    onClick={() => set('sections', form.sections.filter((_, j) => j !== i))}
+                    className="shrink-0 rounded-full border border-[#c05f4e]/40 px-3 py-2 text-[0.62rem] uppercase tracking-[0.14em] text-[#c05f4e] transition-colors hover:bg-[#c05f4e]/10"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <RichEditor
+                  html={sc.body}
+                  onChange={(h) => setSection(i, { ...sc, body: h })}
+                  placeholder="Write this section — format with the toolbar above…"
+                  minHeight={220}
+                />
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => set('sections', [...form.sections, { heading: '', body: '' }])}
+              className="rounded-full border border-[#b98a4a]/40 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[#a6783c] transition-colors hover:border-[#b98a4a]/70"
+            >
+              + Add section
+            </button>
+          </div>
+        ) : form.taSections ? (
+          <div className="space-y-5">
+            {form.taSections.map((sc, i) => (
+              <div key={i} className={`rounded-2xl border ${C.border} bg-[#fdfaf3] p-4 md:p-5`}>
+                <div className="mb-3 flex items-center gap-3">
+                  <TextInput value={sc.heading} onChange={(e) => setTaSection(i, { ...sc, heading: e.target.value })} placeholder={form.sections[i]?.heading || 'தமிழ் பிரிவு தலைப்பு'} />
+                  <button
+                    type="button"
+                    onClick={() => set('taSections', (form.taSections ?? []).filter((_, j) => j !== i))}
+                    className="shrink-0 rounded-full border border-[#c05f4e]/40 px-3 py-2 text-[0.62rem] uppercase tracking-[0.14em] text-[#c05f4e] transition-colors hover:bg-[#c05f4e]/10"
+                  >
+                    Remove
+                  </button>
+                </div>
+                <RichEditor
+                  key={`ta-sec-${i}`}
+                  html={sc.body}
+                  onChange={(h) => setTaSection(i, { ...sc, body: h })}
+                  placeholder="இப்பிரிவை தமிழில் எழுதுங்கள் — மேலுள்ள கருவிப்பட்டையால் வடிவமைக்கவும்…"
+                  minHeight={220}
+                />
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => set('taSections', [...(form.taSections ?? []), { heading: '', body: '' }])}
+              className="rounded-full border border-[#b98a4a]/40 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[#a6783c] transition-colors hover:border-[#b98a4a]/70"
+            >
+              + Add section
+            </button>
+          </div>
+        ) : (
+          <div className={`rounded-2xl border ${C.border} bg-[#fdfaf3] px-6 py-5`}>
+            <p className="mb-2 text-[0.82rem] leading-relaxed text-[#7a6a50]">
+              No Tamil sections yet — without them the Tamil page is built from the Tamil summary alone.
+            </p>
+            <button
+              type="button"
+              onClick={() => set('taSections', form.sections.map(() => ({ heading: '', body: '' })))}
+              className="rounded-full border border-[#b98a4a]/40 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[#a6783c] transition-colors hover:border-[#b98a4a]/70"
+            >
+              Mirror the English section structure
+            </button>
+          </div>
+        )}
+
+        <div className={`rounded-2xl border ${C.border} bg-[#fdfaf3] px-6 py-5`}>
+          <p className={labelCls}>Quick facts (label — value, one per line){taMode ? ' — தமிழ்' : ''}</p>
+          {taMode && !form.taFacts ? (
+            <>
+              <p className="mb-2 text-[0.82rem] leading-relaxed text-[#7a6a50]">No Tamil quick facts yet — the Tamil page falls back to the English facts.</p>
               <button
                 type="button"
-                onClick={() => set('sections', form.sections.filter((_, j) => j !== i))}
-                className="shrink-0 rounded-full border border-[#c05f4e]/40 px-3 py-2 text-[0.62rem] uppercase tracking-[0.14em] text-[#c05f4e] transition-colors hover:bg-[#c05f4e]/10"
+                onClick={() => set('taFacts', [...form.facts])}
+                className="rounded-full border border-[#b98a4a]/40 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[#a6783c] transition-colors hover:border-[#b98a4a]/70"
               >
-                Remove
+                Start from the English facts
               </button>
-            </div>
-            <RichEditor
-              html={sc.body}
-              onChange={(h) => setSection(i, { ...sc, body: h })}
-              placeholder="Write this section — format with the toolbar above…"
-              minHeight={220}
+            </>
+          ) : (
+            <TextArea
+              rows={5}
+              value={(taMode ? form.taFacts ?? [] : form.facts).map((f) => `${f.label} — ${f.value}`).join('\n')}
+              onChange={(e) =>
+                set(taMode ? 'taFacts' : 'facts', e.target.value.split('\n').map((line) => {
+                  const [label, ...rest] = line.split(' — ');
+                  return { label: (label ?? '').trim(), value: rest.join(' — ').trim() };
+                }).filter((f) => f.label))
+              }
             />
-          </div>
-        ))}
-        <button
-          type="button"
-          onClick={() => set('sections', [...form.sections, { heading: '', body: '' }])}
-          className="rounded-full border border-[#b98a4a]/40 px-4 py-2 text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[#a6783c] transition-colors hover:border-[#b98a4a]/70"
-        >
-          + Add section
-        </button>
-      </div>
-
-      <div className={`rounded-2xl border ${C.border} bg-[#fdfaf3] px-6 py-5`}>
-        <p className={labelCls}>Quick facts (label — value, one per line)</p>
-        <TextArea
-          rows={5}
-          value={form.facts.map((f) => `${f.label} — ${f.value}`).join('\n')}
-          onChange={(e) =>
-            set('facts', e.target.value.split('\n').map((line) => {
-              const [label, ...rest] = line.split(' — ');
-              return { label: (label ?? '').trim(), value: rest.join(' — ').trim() };
-            }).filter((f) => f.label))
-          }
-        />
-      </div>
-
-      <details className={`rounded-2xl border ${C.border} bg-white px-6 py-5`}>
-        <summary className="cursor-pointer font-display text-lg text-[#2c2418]">தமிழ் translation (optional)</summary>
-        <p className="mb-4 mt-1 text-[0.78rem] leading-relaxed text-[#a08b66]">
-          Shown when a visitor switches the site to Tamil. Fields left empty fall back to English — saving here never deletes an existing translation.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Name (Tamil)"><TextInput value={form.taName} onChange={(e) => set('taName', e.target.value)} placeholder={form.name || 'தமிழ் பெயர்'} /></Field>
-          <Field label="Region (Tamil)"><TextInput value={form.taRegion} onChange={(e) => set('taRegion', e.target.value)} placeholder={form.region || 'தமிழ் பிரதேசம்'} /></Field>
-          <Field label="Country (Tamil)"><TextInput value={form.taCountry} onChange={(e) => set('taCountry', e.target.value)} placeholder={form.country || 'தமிழ் நாடு'} /></Field>
+          )}
         </div>
-        <div className="mt-4">
-          <Field label="Summary (Tamil)"><TextArea rows={3} value={form.taSummary} onChange={(e) => set('taSummary', e.target.value)} placeholder="தமிழ் சுருக்கம்…" /></Field>
-        </div>
-      </details>
+      </div>
     </div>
   );
 }
@@ -813,12 +991,13 @@ interface StoryForm {
   taTime: string;
   taLede: string;
   taBody: string;
+  taTag: string;
 }
 
 const emptyStory = (): StoryForm => ({
   id: '', tag: 'Essay', title: '', time: '5 min read', img: '', placeId: '', lede: '', body: '',
   seriesSlug: '', relatedPlaces: [], contributors: [], seoTitle: '', seoDescription: '', seoKeywords: '',
-  taTitle: '', taTime: '', taLede: '', taBody: '',
+  taTitle: '', taTime: '', taLede: '', taBody: '', taTag: '',
 });
 
 /** Builds the story.ta payload; empty form = no translation stored (existing one is preserved by pre-fill). */
@@ -836,6 +1015,7 @@ function storyTaFromForm(f: StoryForm) {
     time: f.taTime.trim() || f.time,
     lede: f.taLede.trim() || f.lede,
     body,
+    ...(f.taTag.trim() ? { tag: f.taTag.trim() } : {}),
   };
 }
 
@@ -861,6 +1041,7 @@ function StoryEditor({
   const storiesQ = trpc.content.adminStories.useQuery();
   const knownTags = Array.from(new Set((storiesQ.data ?? []).map((s) => s.tag).filter(Boolean)));
   const [seoOpen, setSeoOpen] = useState(false);
+  const [lang, setLang] = useState<'en' | 'ta'>('en');
   const slugTouched = useRef(false);
   const slugTaken = isNew && !!form.id && existingSlugs.includes(form.id);
 
@@ -897,16 +1078,30 @@ function StoryEditor({
         {slugTaken && (
           <p className="-mt-3 text-[0.7rem] font-semibold text-[#c05f4e]">⚠ This slug is already used by another post — pick a different one.</p>
         )}
-        <Field label="Tag / category">
-          <TextInput value={form.tag} onChange={(e) => set('tag', e.target.value)} list="story-tag-suggestions" placeholder="Essay, Field Notes, Japan…" />
-          <datalist id="story-tag-suggestions">
-            {knownTags.map((tg) => <option key={tg} value={tg} />)}
-          </datalist>
-        </Field>
-        <p className="-mt-3 text-[0.7rem] leading-relaxed text-[#a08b66]">
-          Free text — type any category name (a country, a theme, anything). Existing categories are suggested as you type.
-        </p>
-        <Field label="Read time"><TextInput value={form.time} onChange={(e) => set('time', e.target.value)} /></Field>
+        {lang === 'en' ? (
+          <>
+            <Field label="Tag / category">
+              <TextInput value={form.tag} onChange={(e) => set('tag', e.target.value)} list="story-tag-suggestions" placeholder="Essay, Field Notes, Japan…" />
+              <datalist id="story-tag-suggestions">
+                {knownTags.map((tg) => <option key={tg} value={tg} />)}
+              </datalist>
+            </Field>
+            <p className="-mt-3 text-[0.7rem] leading-relaxed text-[#a08b66]">
+              Free text — type any category name (a country, a theme, anything). Existing categories are suggested as you type.
+            </p>
+            <Field label="Read time"><TextInput value={form.time} onChange={(e) => set('time', e.target.value)} /></Field>
+          </>
+        ) : (
+          <>
+            <Field label="Tag / category (தமிழ்)">
+              <TextInput value={form.taTag} onChange={(e) => set('taTag', e.target.value)} placeholder={form.tag || 'கட்டுரை, புலக் குறிப்புகள்…'} />
+            </Field>
+            <p className="-mt-3 text-[0.7rem] leading-relaxed text-[#a08b66]">
+              Tamil version of the category label. Leave empty to reuse the English tag.
+            </p>
+            <Field label="Read time (தமிழ்)"><TextInput value={form.taTime} onChange={(e) => set('taTime', e.target.value)} placeholder={form.time || '5 நிமிட வாசிப்பு'} /></Field>
+          </>
+        )}
         <Field label="Series (optional)">
           <select value={form.seriesSlug} onChange={(e) => set('seriesSlug', e.target.value)} className={inputCls}>
             <option value="">— not in a series —</option>
@@ -988,50 +1183,44 @@ function StoryEditor({
       </div>,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, isNew, seoOpen, places.length, seriesList.length, knownTags.length]);
+  }, [form, isNew, seoOpen, lang, places.length, seriesList.length, knownTags.length]);
+
+  const taMode = lang === 'ta';
 
   return (
-    <div className={`rounded-2xl border ${C.border} bg-white px-6 py-6 md:px-10 md:py-8`}>
-      <input
-        value={form.title}
-        onChange={(e) => onTitleChange(e.target.value)}
-        placeholder="Post title"
-        className="w-full bg-transparent font-display text-3xl text-[#2c2418] outline-none placeholder:text-[#c4b291]"
-      />
-      <textarea
-        rows={2}
-        value={form.lede}
-        onChange={(e) => set('lede', e.target.value)}
-        placeholder="Lede — the italic standfirst that opens the piece…"
-        className="mt-4 w-full resize-y bg-transparent text-[1.05rem] italic leading-relaxed text-[#7a6a50] outline-none placeholder:text-[#c4b291]"
-      />
-      <div className={`my-5 border-t ${C.borderSoft}`} />
-      <RichEditor
-        html={form.body}
-        onChange={(h) => set('body', h)}
-        placeholder="Write the story — type # for a heading, > for a quote, - for a list…"
-        minHeight={460}
-        onEditor={onEditor}
-      />
-
-      <details className={`mt-6 rounded-xl border ${C.borderSoft} bg-[#fdfaf3] px-5 py-4`}>
-        <summary className="cursor-pointer font-display text-base text-[#2c2418]">தமிழ் translation (optional)</summary>
-        <p className="mb-3 mt-1 text-[0.76rem] leading-relaxed text-[#a08b66]">
-          Shown when a visitor switches to Tamil. Empty fields fall back to English — saving never deletes an existing translation.
-        </p>
-        <div className="grid gap-3 sm:grid-cols-[1fr_140px]">
-          <TextInput value={form.taTitle} onChange={(e) => set('taTitle', e.target.value)} placeholder={form.title || 'தமிழ் தலைப்பு'} />
-          <TextInput value={form.taTime} onChange={(e) => set('taTime', e.target.value)} placeholder={form.time || '5 நிமிடம்'} />
-        </div>
-        <TextArea rows={2} value={form.taLede} onChange={(e) => set('taLede', e.target.value)} placeholder="தமிழ் அறிமுக வரி…" className="mt-3" />
-        <TextArea
-          rows={8}
-          value={form.taBody}
-          onChange={(e) => set('taBody', e.target.value)}
-          placeholder="தமிழ் கட்டுரை — plain text, one paragraph per line…"
-          className="mt-3 font-body"
+    <div>
+      <LangToggle lang={lang} onChange={setLang} />
+      <div className={`rounded-2xl border ${C.border} bg-white px-6 py-6 md:px-10 md:py-8`}>
+        {taMode && (
+          <p className="mb-4 rounded-lg border border-[#b98a4a]/30 bg-[#f5edd9] px-3 py-2 text-[0.74rem] leading-relaxed text-[#7a6a50]">
+            தமிழ் பதிப்பு — you are editing the Tamil version of this post. Fields left empty fall back to English, and saving stores both versions together.
+          </p>
+        )}
+        <input
+          key={`title-${lang}`}
+          value={taMode ? form.taTitle : form.title}
+          onChange={(e) => (taMode ? set('taTitle', e.target.value) : onTitleChange(e.target.value))}
+          placeholder={taMode ? 'தமிழ் தலைப்பு' : 'Post title'}
+          className="w-full bg-transparent font-display text-3xl text-[#2c2418] outline-none placeholder:text-[#c4b291]"
         />
-      </details>
+        <textarea
+          key={`lede-${lang}`}
+          rows={2}
+          value={taMode ? form.taLede : form.lede}
+          onChange={(e) => (taMode ? set('taLede', e.target.value) : set('lede', e.target.value))}
+          placeholder={taMode ? 'தமிழ் அறிமுக வரி — கட்டுரையைத் திறக்கும் சாய்வு வரி…' : 'Lede — the italic standfirst that opens the piece…'}
+          className="mt-4 w-full resize-y bg-transparent text-[1.05rem] italic leading-relaxed text-[#7a6a50] outline-none placeholder:text-[#c4b291]"
+        />
+        <div className={`my-5 border-t ${C.borderSoft}`} />
+        <RichEditor
+          key={`body-${lang}`}
+          html={taMode ? form.taBody : form.body}
+          onChange={(h) => (taMode ? set('taBody', h) : set('body', h))}
+          placeholder={taMode ? 'தமிழ் கட்டுரை — தலைப்புக்கு #, மேற்கோளுக்கு >, பட்டியலுக்கு - …' : 'Write the story — type # for a heading, > for a quote, - for a list…'}
+          minHeight={460}
+          onEditor={taMode ? undefined : onEditor}
+        />
+      </div>
     </div>
   );
 }
@@ -1059,24 +1248,34 @@ const emptyDest = (): DestForm => ({ id: '', name: '', places: '0 Places', img: 
 
 function DestEditor({ form, setForm, isNew }: { form: DestForm; setForm: (f: DestForm) => void; isNew: boolean }) {
   const set = <K extends keyof DestForm>(k: K, v: DestForm[K]) => setForm({ ...form, [k]: v });
+  const [lang, setLang] = useState<'en' | 'ta'>('en');
+  const taMode = lang === 'ta';
   return (
-    <div className="space-y-5">
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="URL slug"><TextInput value={form.id} onChange={(e) => set('id', e.target.value)} disabled={!isNew} className={!isNew ? 'opacity-50' : ''} /></Field>
-        <Field label="Name"><TextInput value={form.name} onChange={(e) => set('name', e.target.value)} /></Field>
-        <Field label="Places label (2,154 Places)"><TextInput value={form.places} onChange={(e) => set('places', e.target.value)} /></Field>
-        <Field label="Card image"><TextInput value={form.img} onChange={(e) => set('img', e.target.value)} /></Field>
-        <Field label="Map image"><TextInput value={form.mapImg} onChange={(e) => set('mapImg', e.target.value)} /></Field>
-      </div>
-      <Field label="Blurb"><TextArea rows={2} value={form.blurb} onChange={(e) => set('blurb', e.target.value)} /></Field>
-      <details className={`rounded-xl border ${C.borderSoft} bg-[#fdfaf3] px-4 py-3`}>
-        <summary className="cursor-pointer font-display text-base text-[#2c2418]">தமிழ் translation (optional)</summary>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2">
-          <Field label="Name (Tamil)"><TextInput value={form.taName} onChange={(e) => set('taName', e.target.value)} placeholder={form.name || 'தமிழ் பெயர்'} /></Field>
-          <Field label="Places label (Tamil)"><TextInput value={form.taPlacesLabel} onChange={(e) => set('taPlacesLabel', e.target.value)} placeholder="2,154 இடங்கள்" /></Field>
+    <div>
+      <LangToggle lang={lang} onChange={setLang} />
+      <div className="space-y-5">
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field label="URL slug"><TextInput value={form.id} onChange={(e) => set('id', e.target.value)} disabled={!isNew} className={!isNew ? 'opacity-50' : ''} /></Field>
+          {taMode ? (
+            <>
+              <Field label="Name (தமிழ்)"><TextInput value={form.taName} onChange={(e) => set('taName', e.target.value)} placeholder={form.name || 'தமிழ் பெயர்'} /></Field>
+              <Field label="Places label (தமிழ்)"><TextInput value={form.taPlacesLabel} onChange={(e) => set('taPlacesLabel', e.target.value)} placeholder={form.places || '2,154 இடங்கள்'} /></Field>
+            </>
+          ) : (
+            <>
+              <Field label="Name"><TextInput value={form.name} onChange={(e) => set('name', e.target.value)} /></Field>
+              <Field label="Places label (2,154 Places)"><TextInput value={form.places} onChange={(e) => set('places', e.target.value)} /></Field>
+            </>
+          )}
+          <Field label="Card image"><TextInput value={form.img} onChange={(e) => set('img', e.target.value)} /></Field>
+          <Field label="Map image"><TextInput value={form.mapImg} onChange={(e) => set('mapImg', e.target.value)} /></Field>
         </div>
-        <div className="mt-3"><Field label="Blurb (Tamil)"><TextArea rows={2} value={form.taBlurb} onChange={(e) => set('taBlurb', e.target.value)} /></Field></div>
-      </details>
+        {taMode ? (
+          <Field label="Blurb (தமிழ்)"><TextArea rows={2} value={form.taBlurb} onChange={(e) => set('taBlurb', e.target.value)} placeholder="தமிழ் அறிமுகம்…" /></Field>
+        ) : (
+          <Field label="Blurb"><TextArea rows={2} value={form.blurb} onChange={(e) => set('blurb', e.target.value)} /></Field>
+        )}
+      </div>
     </div>
   );
 }
@@ -1902,7 +2101,7 @@ export default function AdminPage() {
     if (ed.section === 'posts') {
       const s = ed.key === null ? null : storiesQ.data?.find((x) => x.id === ed.key);
       setStoryFormS(s
-        ? { id: s.id, tag: s.tag, title: s.title, time: s.time, img: s.img, placeId: s.placeId ?? '', lede: s.lede, body: toHtml(s.body), seriesSlug: s.seriesSlug ?? '', relatedPlaces: s.relatedPlaces ?? [], contributors: s.contributors ?? [], seoTitle: s.seoTitle ?? '', seoDescription: s.seoDescription ?? '', seoKeywords: s.seoKeywords ?? '', taTitle: s.ta?.title ?? '', taTime: s.ta?.time ?? '', taLede: s.ta?.lede ?? '', taBody: s.ta ? toHtml(s.ta.body) : '' }
+        ? { id: s.id, tag: s.tag, title: s.title, time: s.time, img: s.img, placeId: s.placeId ?? '', lede: s.lede, body: toHtml(s.body), seriesSlug: s.seriesSlug ?? '', relatedPlaces: s.relatedPlaces ?? [], contributors: s.contributors ?? [], seoTitle: s.seoTitle ?? '', seoDescription: s.seoDescription ?? '', seoKeywords: s.seoKeywords ?? '', taTitle: s.ta?.title ?? '', taTime: s.ta?.time ?? '', taLede: s.ta?.lede ?? '', taBody: s.ta ? toHtml(s.ta.body) : '', taTag: s.ta?.tag ?? '' }
         : emptyStory());
     }
     if (ed.section === 'series') {

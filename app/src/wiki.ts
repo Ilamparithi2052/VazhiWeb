@@ -20,6 +20,10 @@ export interface Contributor {
   bio?: string;
   photo?: string;
   link?: string;
+  /** photo framing: zoom (1–3) and focal point as % offsets (0–100, default 50/50) */
+  photoZoom?: number;
+  photoX?: number;
+  photoY?: number;
 }
 
 export interface PlaceArticle {

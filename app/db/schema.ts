@@ -65,6 +65,7 @@ export interface StoryTaData {
   time: string;
   lede: string;
   body: RichBody;
+  tag?: string;
 }
 
 /** A credited contributor on a story or place page. */
@@ -74,6 +75,10 @@ export interface ContributorData {
   bio?: string;
   photo?: string;
   link?: string;
+  /** photo framing: zoom (1–3) and focal point as % offsets (0–100, default 50/50) */
+  photoZoom?: number;
+  photoX?: number;
+  photoY?: number;
 }
 
 /** Long-form place articles (the wiki). */

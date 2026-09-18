@@ -38,7 +38,17 @@ export default function ContributorsCard({ contributors }: { contributors?: Cont
           return (
             <div key={`${c.name}-${i}`} className="card-ring flex gap-4 rounded-xl bg-surf p-5">
               {src ? (
-                <img src={src} alt={c.name} className="card-ring h-14 w-14 shrink-0 rounded-full object-cover" />
+                <span className="card-ring block h-14 w-14 shrink-0 overflow-hidden rounded-full">
+                  <img
+                    src={src}
+                    alt={c.name}
+                    className="h-full w-full object-cover"
+                    style={{
+                      objectPosition: `${c.photoX ?? 50}% ${c.photoY ?? 50}%`,
+                      ...(c.photoZoom && c.photoZoom > 1 ? { transform: `scale(${c.photoZoom})` } : {}),
+                    }}
+                  />
+                </span>
               ) : (
                 <span className="card-ring flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-surf3 font-display text-lg text-bronze">
                   {initials(c.name)}
