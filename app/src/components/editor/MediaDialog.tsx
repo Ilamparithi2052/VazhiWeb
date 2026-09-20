@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { trpc } from '@/providers/trpc';
 import { resolveImgSrc } from '../../richtext';
 import type { MediaSelection } from './mediaPicker';
@@ -203,10 +204,12 @@ export default function MediaDialog({ open, initial, initialTab, onPick, onClose
     </button>
   );
 
-  return (
+  // Portal to document.body — without this, an ancestor with transform/filter
+  // traps the "fixed" overlay inside the editor and the dialog overlaps the toolbar.
+  return createPortal(
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/35 p-5" onClick={onClose}>
       <div
-        className="flex max-h-[86vh] w-full max-w-[640px] flex-col overflow-hidden rounded-2xl border border-[#ddcdab] bg-[#fdfaf3] shadow-2xl"
+        className="flex max-h-[86vh] w-full max-w-[720px] flex-col overflow-hidden rounded-2xl border border-[#ddcdab] bg-[#fdfaf3] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[#eee2ca] px-5 py-3.5">
@@ -381,6 +384,7 @@ export default function MediaDialog({ open, initial, initialTab, onPick, onClose
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
